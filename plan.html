@@ -1,0 +1,1494 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<title>План помещения</title>
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/konva@9.3.0/konva.min.js"></script>
+
+<style>
+  body {
+    margin: 0;
+    background: #f3f4f7;
+    font-family: Arial, Helvetica, sans-serif;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+
+  .header {
+    background: #fff;
+    border-bottom: 1px solid #ddd;
+    padding: 16px;
+    text-align: center;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+
+  #plan-container {
+    flex: 1;
+    background: #fff;
+    touch-action: none;
+    position: relative;
+  }
+
+  .controls {
+    background: #fff;
+    border-top: 1px solid #ddd;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .button-row {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .button-row.single-button {
+    justify-content: center;
+    height: 44px;
+  }
+
+  .btn-control {
+    height: 44px;
+    font-size: 16px;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .btn-height {
+    padding: 0 20px;
+    flex: none;
+    width: 100%;
+  }
+
+  .empty-plan {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: 40px;
+    text-align: center;
+    color: #666;
+  }
+
+  .empty-plan .icon {
+    font-size: 64px;
+    margin-bottom: 16px;
+    opacity: 0.5;
+  }
+
+  .modal-content {
+    border-radius: 12px;
+    border: none;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+  }
+
+  .modal-header {
+    background: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    border-radius: 12px 12px 0 0;
+    padding: 16px 20px;
+  }
+
+  .modal-body {
+    padding: 20px;
+    max-height: 70vh;
+    overflow-y: auto;
+  }
+
+  .form-label {
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 8px;
+  }
+
+  .form-control {
+    border-radius: 8px;
+    border: 1px solid #ced4da;
+    padding: 10px 12px;
+    font-size: 16px;
+  }
+
+  .form-control:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+  }
+
+  .object-type-selector {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+
+  .object-type-btn {
+    flex: 1;
+    padding: 12px;
+    border: 2px solid #dee2e6;
+    border-radius: 8px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.3s;
+    text-align: center;
+  }
+
+  .object-type-btn.active {
+    border-color: #0d6efd;
+    background: #e7f1ff;
+  }
+
+  .object-type-btn.window.active {
+    border-color: #0dcaf0;
+    background: #e8f7ff;
+  }
+
+  .object-type-btn.door.active {
+    border-color: #20c997;
+    background: #e8f8f3;
+  }
+
+  .objects-list {
+    margin-top: 20px;
+    border-top: 1px solid #eee;
+    padding-top: 15px;
+  }
+
+  .objects-list h6 {
+    margin-bottom: 10px;
+    color: #555;
+  }
+
+  .object-item {
+    display: flex;
+    justify-content: between;
+    align-items: center;
+    padding: 10px 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.3s ease;
+    touch-action: pan-y;
+    user-select: none;
+  }
+
+  .object-item-content {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+  }
+
+  .object-icon {
+    font-size: 20px;
+  }
+
+  .object-details {
+    flex: 1;
+  }
+
+  .object-type {
+    font-weight: 600;
+    font-size: 14px;
+  }
+
+  .object-specs {
+    font-size: 12px;
+    color: #666;
+  }
+
+  .delete-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: #dc3545;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 20px;
+    font-weight: bold;
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+  }
+
+  .object-item.deleting .delete-overlay {
+    transform: translateX(0);
+  }
+
+  .empty-objects {
+    text-align: center;
+    padding: 20px;
+    color: #999;
+    font-style: italic;
+  }
+
+  .height-info {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 20px;
+  }
+
+  .height-info h6 {
+    margin-bottom: 10px;
+    color: #333;
+  }
+
+  .height-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    font-size: 14px;
+  }
+
+  .height-stat {
+    display: flex;
+    justify-content: space-between;
+    padding: 5px 0;
+  }
+
+  .height-stat .label {
+    color: #666;
+  }
+
+  .height-stat .value {
+    font-weight: 600;
+    color: #333;
+  }
+
+  .wall-mockup {
+    margin: 15px 0;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+  }
+
+  .mockup-container {
+    position: relative;
+    height: 200px;
+    background: linear-gradient(to bottom, #f8f9fa, #e9ecef);
+    border: 2px solid #dee2e6;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .wall-representation {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+  }
+
+  .object-mockup {
+    position: absolute;
+    border: 2px solid;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+    font-size: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .window-mockup {
+    background: rgba(13, 202, 240, 0.6);
+    border-color: #0dcaf0;
+  }
+
+  .door-mockup {
+    background: rgba(32, 201, 151, 0.6);
+    border-color: #20c997;
+  }
+
+  .window-height-inputs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .door-height-inputs {
+    grid-template-columns: 1fr;
+  }
+
+  .window-height-inputs {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+  }
+
+  .form-control {
+    margin-top: 0.5rem;
+  }
+</style>
+</head>
+
+<body>
+<div class="header">
+  <h1 class="h4 mb-0">План помещения</h1>
+  <div style="font-size: 14px; color: #666; margin-top: 8px;">Двойной клик по стене для добавления окна или двери</div>
+</div>
+
+<div id="plan-container">
+  <div class="empty-plan">
+    <div class="icon">📐</div>
+    <div style="font-size: 18px; margin-bottom: 8px;">План не построен</div>
+    <div style="font-size: 14px;">Вернитесь в редактор и добавьте стены</div>
+  </div>
+</div>
+
+<div class="controls">
+  <!-- Первая строка: 2 кнопки -->
+  <div class="button-row">
+    <button id="btnBack" class="btn btn-secondary btn-control">← Назад</button>
+    <button id="btnResetView" class="btn btn-info btn-control">⟲ Сбросить вид</button>
+  </div>
+  
+  <!-- Вторая строка: 2 кнопки -->
+  <div class="button-row">
+    <button id="btnZoomIn" class="btn btn-primary btn-control">+</button>
+    <button id="btnZoomOut" class="btn btn-primary btn-control">-</button>
+  </div>
+  
+  <!-- Третья строка: 1 большая кнопка -->
+  <div class="button-row single-button">
+    <button id="btnSettings" class="btn btn-success btn-height">⚙ Высота стен</button>
+  </div>
+</div>
+
+<!-- Универсальное модальное окно для добавления объектов -->
+<div class="modal fade" id="objectModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Стена <span id="wallNumber"></span> - Объекты</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="object-type-selector">
+          <div class="object-type-btn window active" data-type="window">
+            <div style="font-size: 24px;">🪟</div>
+            <div>Окно</div>
+          </div>
+          <div class="object-type-btn door" data-type="door">
+            <div style="font-size: 24px;">🚪</div>
+            <div>Дверь</div>
+          </div>
+        </div>
+
+        <!-- Основные параметры -->
+        <div class="mb-3">
+          <label class="form-label">Ширина объекта (м)</label>
+          <input type="number" step="0.1" min="0.1" max="5" value="1.2" class="form-control" id="objectWidth">
+        </div>
+        
+        <div class="mb-3">
+          <label class="form-label">Расстояние от начала стены (м)</label>
+          <input type="number" step="0.1" min="0" value="0.5" class="form-control" id="objectDistance">
+        </div>
+
+        <!-- Параметры высоты для окон -->
+        <div class="window-height-inputs">
+          <div class="mb-3">
+            <label class="form-label">Высота от пола до окна (м)</label>
+            <input type="number" step="0.1" min="0" max="5" value="0.9" class="form-control" id="windowBottomHeight">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Высота окна (м)</label>
+            <input type="number" step="0.1" min="0.1" max="5" value="1.2" class="form-control mt-4" id="windowHeight">
+          </div>
+        </div>
+        
+        <!-- Параметры высоты для дверей -->
+        <div class="door-height-inputs">
+          <div class="mb-3">
+            <label class="form-label">Высота двери (м)</label>
+            <input type="number" step="0.1" min="0.1" max="5" value="2.0" class="form-control" id="doorHeight">
+          </div>
+        </div>
+        
+        <!-- Визуальный макет для окон -->
+        <div class="wall-mockup window-mockup-container">
+          <label class="form-label">Макет расположения окна на стене</label>
+          <div class="mockup-container">
+            <div class="wall-representation">
+              <div class="object-mockup window-mockup" id="windowMockup">ОКНО</div>
+            </div>
+          </div>
+          <div class="form-text text-center" id="windowMockupInfo">
+            Высота окна: <span id="windowHeightValue">1.2</span> м • От пола: <span id="windowBottomValue">0.9</span> м • До потолка: <span id="windowTopValue">0.4</span> м
+          </div>
+        </div>
+        
+        <!-- Визуальный макет для дверей -->
+        <div class="wall-mockup door-mockup-container" style="display: none;">
+          <label class="form-label">Макет расположения двери на стене</label>
+          <div class="mockup-container">
+            <div class="wall-representation">
+              <div class="object-mockup door-mockup" id="doorMockup">ДВЕРЬ</div>
+            </div>
+          </div>
+          <div class="form-text text-center" id="doorMockupInfo">
+            Высота двери: <span id="doorHeightValue">2.0</span> м • До потолка: <span id="doorTopValue">0.5</span> м
+          </div>
+        </div>
+        
+        <div class="mb-3">
+          <label class="form-label">Длина стены: <span id="wallLengthValue">0</span> м</label>
+          <div class="progress mt-2">
+            <div id="placementIndicator" class="progress-bar" style="width: 0%"></div>
+          </div>
+          <div class="form-text" id="placementInfo"></div>
+        </div>
+
+        <button type="button" class="btn btn-primary w-100" id="btnConfirmObject">Добавить объект</button>
+
+        <!-- Список объектов на стене -->
+        <div class="objects-list">
+          <h6>Объекты на этой стене:</h6>
+          <div id="objectsListContainer">
+            <div class="empty-objects">Нет добавленных объектов</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Модальное окно для настройки высоты стен -->
+<div class="modal fade" id="heightModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Настройка высоты стен</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Высота стен (м)</label>
+          <input type="number" step="0.1" min="0.1" max="10" value="2.5" class="form-control" id="wallHeight">
+          <div class="form-text">Общая высота всех стен помещения</div>
+        </div>
+
+        <div class="height-info">
+          <h6>Текущие параметры:</h6>
+          <div class="height-stats">
+            <div class="height-stat">
+              <span class="label">Высота стен:</span>
+              <span class="value" id="currentWallHeight">2.5 м</span>
+            </div>
+            <div class="height-stat">
+              <span class="label">Окон добавлено:</span>
+              <span class="value" id="windowsCount">0 шт</span>
+            </div>
+            <div class="height-stat">
+              <span class="label">Дверей добавлено:</span>
+              <span class="value" id="doorsCount">0 шт</span>
+            </div>
+            <div class="height-stat">
+              <span class="label">Общая площадь стен:</span>
+              <span class="value" id="totalWallArea">0 м²</span>
+            </div>
+          </div>
+        </div>
+
+        <button type="button" class="btn btn-primary w-100" id="btnSaveHeights">Сохранить настройки</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// Константы
+const PIXELS_PER_METER = 50;
+let stage, layer;
+let walls = [];
+let windows = [];
+let doors = [];
+let scale = 1;
+let selectedWallIndex = null;
+let currentObjectType = 'window';
+let objectModal = null;
+let heightModal = null;
+
+// Настройки высот
+let roomSettings = {
+  wallHeight: 2.5
+};
+
+// Загрузка данных из localStorage
+function loadData() {
+  const savedWalls = localStorage.getItem('roomWalls');
+  const savedWindows = localStorage.getItem('roomWindows');
+  const savedDoors = localStorage.getItem('roomDoors');
+  const savedSettings = localStorage.getItem('roomSettings');
+  
+  if (savedWalls) {
+    walls = JSON.parse(savedWalls);
+  }
+  if (savedWindows) {
+    windows = JSON.parse(savedWindows);
+  }
+  if (savedDoors) {
+    doors = JSON.parse(savedDoors);
+  }
+  if (savedSettings) {
+    roomSettings = JSON.parse(savedSettings);
+  }
+  
+  if (walls.length > 0) {
+    drawPlan();
+  }
+}
+
+// Сохранение данных в localStorage
+function saveData() {
+  localStorage.setItem('roomWalls', JSON.stringify(walls));
+  localStorage.setItem('roomWindows', JSON.stringify(windows));
+  localStorage.setItem('roomDoors', JSON.stringify(doors));
+  localStorage.setItem('roomSettings', JSON.stringify(roomSettings));
+}
+
+// Расчет общей площади стен
+function calculateWallArea() {
+  let totalLength = 0;
+  walls.forEach(wall => {
+    totalLength += wall.length;
+  });
+  return (totalLength * roomSettings.wallHeight).toFixed(1);
+}
+
+// Обновление статистики в модальном окне высот
+function updateHeightStats() {
+  document.getElementById('currentWallHeight').textContent = roomSettings.wallHeight + ' м';
+  document.getElementById('windowsCount').textContent = windows.length + ' шт';
+  document.getElementById('doorsCount').textContent = doors.length + ' шт';
+  document.getElementById('totalWallArea').textContent = calculateWallArea() + ' м²';
+}
+
+// Обновление макета для окон
+function updateWindowMockup() {
+  const windowHeight = parseFloat(document.getElementById('windowHeight').value) || 0;
+  const bottomHeight = parseFloat(document.getElementById('windowBottomHeight').value) || 0;
+  const wallHeight = roomSettings.wallHeight;
+  const wallLength = walls[selectedWallIndex].length;
+  const objectWidth = parseFloat(document.getElementById('objectWidth').value) || 0;
+  
+  // Вычисляем расстояние от окна до потолка
+  const topHeight = wallHeight - bottomHeight - windowHeight;
+  
+  // Обновляем значения в информации
+  document.getElementById('windowHeightValue').textContent = windowHeight.toFixed(1);
+  document.getElementById('windowBottomValue').textContent = bottomHeight.toFixed(1);
+  document.getElementById('windowTopValue').textContent = topHeight.toFixed(1);
+  
+  // Обновляем макет
+  const windowMockup = document.getElementById('windowMockup');
+  const containerWidth = 300; // примерная ширина контейнера
+  const containerHeight = 200; // высота контейнера
+  
+  // Позиционирование по ширине - объект по центру
+  const widthPercent = (objectWidth / wallLength) * 100;
+  
+  // Позиционирование по высоте
+  const bottomPercent = (bottomHeight / wallHeight) * 100;
+  const heightPercent = (windowHeight / wallHeight) * 100;
+  
+  // Объект всегда по центру
+  windowMockup.style.width = widthPercent + '%';
+  windowMockup.style.bottom = bottomPercent + '%';
+  windowMockup.style.height = heightPercent + '%';
+  
+  // Проверяем, помещается ли окно
+  const fits = windowHeight > 0 && topHeight >= 0;
+  const infoElement = document.getElementById('windowMockupInfo');
+  
+  if (fits) {
+    infoElement.className = 'form-text text-center text-success';
+  } else {
+    infoElement.className = 'form-text text-center text-danger';
+  }
+}
+
+// Обновление макета для дверей
+function updateDoorMockup() {
+  const doorHeight = parseFloat(document.getElementById('doorHeight').value) || 0;
+  const wallHeight = roomSettings.wallHeight;
+  const wallLength = walls[selectedWallIndex].length;
+  const objectWidth = parseFloat(document.getElementById('objectWidth').value) || 0;
+  
+  // Вычисляем расстояние от двери до потолка
+  const topHeight = wallHeight - doorHeight;
+  
+  // Обновляем значения в информации
+  document.getElementById('doorHeightValue').textContent = doorHeight.toFixed(1);
+  document.getElementById('doorTopValue').textContent = topHeight.toFixed(1);
+  
+  // Обновляем макет
+  const doorMockup = document.getElementById('doorMockup');
+  
+  // Позиционирование по ширине - объект по центру
+  const widthPercent = (objectWidth / wallLength) * 100;
+  
+  // Позиционирование по высоте
+  const heightPercent = (doorHeight / wallHeight) * 100;
+  
+  // Объект всегда по центру
+  doorMockup.style.width = widthPercent + '%';
+  doorMockup.style.bottom = '0%';
+  doorMockup.style.height = heightPercent + '%';
+  
+  // Проверяем, помещается ли дверь
+  const fits = doorHeight > 0 && topHeight >= 0;
+  const infoElement = document.getElementById('doorMockupInfo');
+  
+  if (fits) {
+    infoElement.className = 'form-text text-center text-success';
+  } else {
+    infoElement.className = 'form-text text-center text-danger';
+  }
+}
+
+// Построение плана помещения
+function drawPlan() {
+  // Очищаем контейнер
+  const container = document.getElementById('plan-container');
+  container.innerHTML = '';
+  
+  // Создаем сцену
+  stage = new Konva.Stage({
+    container: 'plan-container',
+    width: container.clientWidth,
+    height: container.clientHeight,
+    listening: true
+  });
+
+  layer = new Konva.Layer({
+    listening: true
+  });
+  stage.add(layer);
+
+  // Начальная позиция (центр экрана)
+  let currentX = stage.width() / 2;
+  let currentY = stage.height() / 2;
+  let currentAngle = 0;
+
+  // Сохраняем позиции стен для дальнейшего использования
+  const wallPositions = [];
+
+  // Рисуем начальную точку
+  const startPoint = new Konva.Circle({
+    x: currentX,
+    y: currentY,
+    radius: 8,
+    fill: '#28a745',
+    stroke: '#fff',
+    strokeWidth: 2,
+    listening: false
+  });
+  layer.add(startPoint);
+
+  // Рисуем стены
+  walls.forEach((wall, index) => {
+    // Вычисляем конечную точку стены
+    const angleRad = (currentAngle + wall.angle) * Math.PI / 180;
+    const endX = currentX + Math.cos(angleRad) * wall.length * PIXELS_PER_METER;
+    const endY = currentY + Math.sin(angleRad) * wall.length * PIXELS_PER_METER;
+
+    // Сохраняем позиции стены
+    wallPositions.push({
+      startX: currentX,
+      startY: currentY,
+      endX: endX,
+      endY: endY,
+      angle: currentAngle + wall.angle,
+      length: wall.length
+    });
+
+    // Создаем невидимую линию для обработки кликов
+    const hitLine = new Konva.Line({
+      points: [currentX, currentY, endX, endY],
+      stroke: 'rgba(0,0,0,0.01)',
+      strokeWidth: 40,
+      lineCap: 'round',
+      lineJoin: 'round',
+      name: `wall-hit-${index}`,
+      listening: true
+    });
+
+    // Добавляем обработчик двойного клика для выбора стены
+    let lastClickTime = 0;
+    hitLine.on('click tap', (e) => {
+      const currentTime = new Date().getTime();
+      const timeDiff = currentTime - lastClickTime;
+      
+      if (timeDiff < 500 && timeDiff > 0) {
+        selectedWallIndex = index;
+        openObjectModal(index);
+        lastClickTime = 0;
+      } else {
+        lastClickTime = currentTime;
+      }
+      
+      // Останавливаем распространение события
+      e.cancelBubble = true;
+    });
+
+    // Рисуем видимую линию стены
+    const line = new Konva.Line({
+      points: [currentX, currentY, endX, endY],
+      stroke: '#333',
+      strokeWidth: 8,
+      lineCap: 'round',
+      lineJoin: 'round',
+      name: `wall-${index}`,
+      listening: false
+    });
+
+    // Рисуем начальную точку стены (кроме первой)
+    if (index > 0) {
+      const joint = new Konva.Circle({
+        x: currentX,
+        y: currentY,
+        radius: 5,
+        fill: '#0d6efd',
+        listening: false
+      });
+      layer.add(joint);
+    }
+
+    // Вычисляем середину стены для номера
+    const midX = (currentX + endX) / 2;
+    const midY = (currentY + endY) / 2;
+    
+    // Вычисляем перпендикулярное направление для смещения номера
+    const wallAngle = Math.atan2(endY - currentY, endX - currentX);
+    const offsetDistance = 25;
+    const offsetX = Math.cos(wallAngle + Math.PI/2) * offsetDistance;
+    const offsetY = Math.sin(wallAngle + Math.PI/2) * offsetDistance;
+    
+    // Добавляем номер стены сбоку от стены
+    const textBackground = new Konva.Rect({
+      x: midX + offsetX - 15,
+      y: midY + offsetY - 10,
+      width: 30,
+      height: 20,
+      fill: 'rgba(255, 255, 255, 0.9)',
+      stroke: '#ddd',
+      strokeWidth: 1,
+      cornerRadius: 4,
+      listening: false
+    });
+
+    const text = new Konva.Text({
+      x: midX + offsetX - 10,
+      y: midY + offsetY - 8,
+      text: (index + 1).toString(),
+      fontSize: 14,
+      fontFamily: 'Arial',
+      fill: '#333',
+      fontWeight: 'bold',
+      listening: false
+    });
+
+    // Добавляем все элементы на слой в правильном порядке
+    layer.add(hitLine); // Сначала hitLine для обработки событий
+    layer.add(line);
+    layer.add(textBackground);
+    layer.add(text);
+
+    // Обновляем текущую позицию и угол
+    currentX = endX;
+    currentY = endY;
+    currentAngle += wall.angle;
+  });
+
+  // Рисуем окна
+  windows.forEach((window, index) => {
+    const wallPos = wallPositions[window.wallIndex];
+    if (!wallPos) return;
+
+    // Вычисляем позицию окна на стене
+    const angleRad = wallPos.angle * Math.PI / 180;
+    const windowStartX = wallPos.startX + Math.cos(angleRad) * window.distance * PIXELS_PER_METER;
+    const windowStartY = wallPos.startY + Math.sin(angleRad) * window.distance * PIXELS_PER_METER;
+    const windowEndX = windowStartX + Math.cos(angleRad) * window.width * PIXELS_PER_METER;
+    const windowEndY = windowStartY + Math.sin(angleRad) * window.width * PIXELS_PER_METER;
+
+    // Рисуем окно (синяя линия)
+    const windowLine = new Konva.Line({
+      points: [windowStartX, windowStartY, windowEndX, windowEndY],
+      stroke: '#0dcaf0',
+      strokeWidth: 12,
+      lineCap: 'round',
+      listening: false
+    });
+
+    // Добавляем подложку для лучшей видимости
+    const windowBackground = new Konva.Line({
+      points: [windowStartX, windowStartY, windowEndX, windowEndY],
+      stroke: 'white',
+      strokeWidth: 14,
+      lineCap: 'round',
+      listening: false
+    });
+
+    layer.add(windowBackground);
+    layer.add(windowLine);
+  });
+
+  // Рисуем двери
+  doors.forEach((door, index) => {
+    const wallPos = wallPositions[door.wallIndex];
+    if (!wallPos) return;
+
+    // Вычисляем позицию двери на стене
+    const angleRad = wallPos.angle * Math.PI / 180;
+    const doorStartX = wallPos.startX + Math.cos(angleRad) * door.distance * PIXELS_PER_METER;
+    const doorStartY = wallPos.startY + Math.sin(angleRad) * door.distance * PIXELS_PER_METER;
+    const doorEndX = doorStartX + Math.cos(angleRad) * door.width * PIXELS_PER_METER;
+    const doorEndY = doorStartY + Math.sin(angleRad) * door.width * PIXELS_PER_METER;
+
+    // Рисуем дверь (зеленая линия с разрывом)
+    const doorLine = new Konva.Line({
+      points: [doorStartX, doorStartY, doorEndX, doorEndY],
+      stroke: '#20c997',
+      strokeWidth: 8,
+      lineCap: 'round',
+      dash: [10, 5],
+      listening: false
+    });
+
+    // Добавляем подложку для лучшей видимости
+    const doorBackground = new Konva.Line({
+      points: [doorStartX, doorStartY, doorEndX, doorEndY],
+      stroke: 'white',
+      strokeWidth: 10,
+      lineCap: 'round',
+      listening: false
+    });
+
+    // Рисуем дугу открывания двери
+    const arcRadius = door.width * PIXELS_PER_METER;
+    const doorArc = new Konva.Arc({
+      x: doorStartX,
+      y: doorStartY,
+      innerRadius: 0,
+      outerRadius: arcRadius,
+      angle: 90,
+      rotation: wallPos.angle,
+      stroke: '#20c997',
+      strokeWidth: 2,
+      opacity: 0.7,
+      listening: false
+    });
+
+    layer.add(doorBackground);
+    layer.add(doorLine);
+    layer.add(doorArc);
+  });
+
+  // Рисуем конечную точку
+  const endPoint = new Konva.Circle({
+    x: currentX,
+    y: currentY,
+    radius: 8,
+    fill: '#dc3545',
+    stroke: '#fff',
+    strokeWidth: 2,
+    listening: false
+  });
+  layer.add(endPoint);
+
+  // Добавляем легенду
+  const legend = new Konva.Group({
+    x: 20,
+    y: 20,
+    listening: false
+  });
+
+  const legendBackground = new Konva.Rect({
+    width: 180,
+    height: 120,
+    fill: 'white',
+    stroke: '#ddd',
+    strokeWidth: 1,
+    cornerRadius: 8,
+    listening: false
+  });
+
+  const startLegend = new Konva.Circle({
+    x: 20,
+    y: 25,
+    radius: 6,
+    fill: '#28a745',
+    listening: false
+  });
+
+  const startText = new Konva.Text({
+    x: 35,
+    y: 20,
+    text: 'Начало',
+    fontSize: 14,
+    fontFamily: 'Arial',
+    fill: '#333',
+    listening: false
+  });
+
+  const endLegend = new Konva.Circle({
+    x: 20,
+    y: 50,
+    radius: 6,
+    fill: '#dc3545',
+    listening: false
+  });
+
+  const endText = new Konva.Text({
+    x: 35,
+    y: 45,
+    text: 'Конец',
+    fontSize: 14,
+    fontFamily: 'Arial',
+    fill: '#333',
+    listening: false
+  });
+
+  const windowLegend = new Konva.Line({
+    points: [15, 75, 25, 75],
+    stroke: '#0dcaf0',
+    strokeWidth: 8,
+    lineCap: 'round',
+    listening: false
+  });
+
+  const windowText = new Konva.Text({
+    x: 35,
+    y: 70,
+    text: 'Окно',
+    fontSize: 14,
+    fontFamily: 'Arial',
+    fill: '#333',
+    listening: false
+  });
+
+  const doorLegend = new Konva.Line({
+    points: [15, 100, 25, 100],
+    stroke: '#20c997',
+    strokeWidth: 8,
+    lineCap: 'round',
+    dash: [10, 5],
+    listening: false
+  });
+
+  const doorText = new Konva.Text({
+    x: 35,
+    y: 95,
+    text: 'Дверь',
+    fontSize: 14,
+    fontFamily: 'Arial',
+    fill: '#333',
+    listening: false
+  });
+
+  legend.add(legendBackground);
+  legend.add(startLegend);
+  legend.add(startText);
+  legend.add(endLegend);
+  legend.add(endText);
+  legend.add(windowLegend);
+  legend.add(windowText);
+  legend.add(doorLegend);
+  legend.add(doorText);
+  layer.add(legend);
+
+  layer.batchDraw();
+
+  // Включаем перетаскивание
+  stage.draggable(true);
+}
+
+// Открытие модального окна для добавления объекта
+function openObjectModal(wallIndex) {
+  const wall = walls[wallIndex];
+  if (!wall) {
+    console.error('Стена не найдена:', wallIndex);
+    return;
+  }
+  
+  selectedWallIndex = wallIndex;
+  
+  // Обновляем информацию в модальном окне
+  document.getElementById('wallNumber').textContent = wallIndex + 1;
+  document.getElementById('wallLengthValue').textContent = wall.length.toFixed(1);
+  
+  // Устанавливаем значения по умолчанию в зависимости от типа объекта
+  const widthInput = document.getElementById('objectWidth');
+  
+  if (currentObjectType === 'window') {
+    widthInput.value = '1.2';
+    widthInput.min = '0.5';
+    widthInput.max = '3';
+    
+    // Показываем поля для окон, скрываем для дверей
+    document.querySelector('.window-height-inputs').style.display = 'grid';
+    document.querySelector('.door-height-inputs').style.display = 'none';
+    document.querySelector('.window-mockup-container').style.display = 'block';
+    document.querySelector('.door-mockup-container').style.display = 'none';
+    
+    // Устанавливаем значения по умолчанию для окон
+    document.getElementById('windowBottomHeight').value = '0.9';
+    document.getElementById('windowHeight').value = '1.2';
+    
+    updateWindowMockup();
+  } else {
+    widthInput.value = '0.9';
+    widthInput.min = '0.6';
+    widthInput.max = '1.2';
+    
+    // Показываем поля для дверей, скрываем для окон
+    document.querySelector('.window-height-inputs').style.display = 'none';
+    document.querySelector('.door-height-inputs').style.display = 'block';
+    document.querySelector('.window-mockup-container').style.display = 'none';
+    document.querySelector('.door-mockup-container').style.display = 'block';
+    
+    // Устанавливаем значения по умолчанию для дверей
+    document.getElementById('doorHeight').value = '2.0';
+    
+    updateDoorMockup();
+  }
+  
+  document.getElementById('objectDistance').value = '0.5';
+  
+  // Обновляем индикатор размещения
+  updatePlacementIndicator();
+  
+  // Обновляем список объектов
+  updateObjectsList();
+  
+  // Показываем модальное окно
+  if (!objectModal) {
+    objectModal = new bootstrap.Modal(document.getElementById('objectModal'));
+  }
+  objectModal.show();
+}
+
+// Открытие модального окна для настройки высот
+function openHeightModal() {
+  // Заполняем поля текущими значениями
+  document.getElementById('wallHeight').value = roomSettings.wallHeight;
+  
+  // Обновляем статистику
+  updateHeightStats();
+  
+  // Показываем модальное окно
+  if (!heightModal) {
+    heightModal = new bootstrap.Modal(document.getElementById('heightModal'));
+  }
+  heightModal.show();
+}
+
+// Сохранение настроек высот
+function saveHeightSettings() {
+  const wallHeight = parseFloat(document.getElementById('wallHeight').value);
+  
+  if (wallHeight) {
+    roomSettings.wallHeight = wallHeight;
+    
+    saveData();
+    
+    // Перерисовываем план для обновления информации о высотах
+    if (walls.length > 0) {
+      drawPlan();
+    }
+    
+    // Закрываем модальное окно
+    const modal = bootstrap.Modal.getInstance(document.getElementById('heightModal'));
+    modal.hide();
+    
+    alert('Настройки высот сохранены!');
+  } else {
+    alert('Пожалуйста, укажите высоту стен.');
+  }
+}
+
+// Обновление списка объектов на стене
+function updateObjectsList() {
+  const container = document.getElementById('objectsListContainer');
+  const wallObjects = [];
+  
+  // Собираем все объекты на выбранной стене
+  windows.forEach((window, index) => {
+    if (window.wallIndex === selectedWallIndex) {
+      wallObjects.push({
+        type: 'window',
+        width: window.width,
+        height: window.height,
+        bottomHeight: window.bottomHeight,
+        distance: window.distance,
+        index: index
+      });
+    }
+  });
+  
+  doors.forEach((door, index) => {
+    if (door.wallIndex === selectedWallIndex) {
+      wallObjects.push({
+        type: 'door',
+        width: door.width,
+        height: door.height,
+        distance: door.distance,
+        index: index
+      });
+    }
+  });
+  
+  // Сортируем объекты по расстоянию от начала стены
+  wallObjects.sort((a, b) => a.distance - b.distance);
+  
+  // Очищаем контейнер
+  container.innerHTML = '';
+  
+  if (wallObjects.length === 0) {
+    container.innerHTML = '<div class="empty-objects">Нет добавленных объектов</div>';
+    return;
+  }
+  
+  // Добавляем объекты в список
+  wallObjects.forEach(obj => {
+    const objectItem = document.createElement('div');
+    objectItem.className = 'object-item';
+    objectItem.setAttribute('data-type', obj.type);
+    objectItem.setAttribute('data-index', obj.index);
+    
+    if (obj.type === 'window') {
+      const topHeight = roomSettings.wallHeight - obj.bottomHeight - obj.height;
+      objectItem.innerHTML = `
+        <div class="object-item-content">
+          <div class="object-icon">🪟</div>
+          <div class="object-details">
+            <div class="object-type">Окно</div>
+            <div class="object-specs">Ш: ${obj.width.toFixed(1)}м × В: ${obj.height.toFixed(1)}м • От пола: ${obj.bottomHeight.toFixed(1)}м • До потолка: ${topHeight.toFixed(1)}м • От начала: ${obj.distance.toFixed(1)}м</div>
+          </div>
+        </div>
+        <div class="delete-overlay">Удалить</div>
+      `;
+    } else {
+      const topHeight = roomSettings.wallHeight - obj.height;
+      objectItem.innerHTML = `
+        <div class="object-item-content">
+          <div class="object-icon">🚪</div>
+          <div class="object-details">
+            <div class="object-type">Дверь</div>
+            <div class="object-specs">Ш: ${obj.width.toFixed(1)}м × В: ${obj.height.toFixed(1)}м • До потолка: ${topHeight.toFixed(1)}м • От начала: ${obj.distance.toFixed(1)}м</div>
+          </div>
+        </div>
+        <div class="delete-overlay">Удалить</div>
+      `;
+    }
+    
+    container.appendChild(objectItem);
+  });
+  
+  // Настраиваем обработчики свайпа
+  setupSwipeHandlers();
+}
+
+// Настройка обработчиков свайпа для объектов
+function setupSwipeHandlers() {
+  const items = document.querySelectorAll('.object-item');
+  
+  items.forEach(item => {
+    let startX = 0;
+    let currentX = 0;
+    let isSwiping = false;
+    
+    item.addEventListener('touchstart', (e) => {
+      startX = e.touches[0].clientX;
+      isSwiping = true;
+      e.preventDefault();
+    }, { passive: false });
+    
+    item.addEventListener('touchmove', (e) => {
+      if (!isSwiping) return;
+      
+      currentX = e.touches[0].clientX;
+      const diff = startX - currentX;
+      
+      // Ограничиваем максимальное смещение
+      if (diff > 0 && diff <= 120) {
+        item.style.transform = `translateX(-${diff}px)`;
+        e.preventDefault();
+      }
+      
+      // Показываем overlay при достаточном смещении
+      if (diff > 60) {
+        item.classList.add('deleting');
+      } else {
+        item.classList.remove('deleting');
+      }
+    }, { passive: false });
+    
+    item.addEventListener('touchend', () => {
+      if (!isSwiping) return;
+      
+      const diff = startX - currentX;
+      
+      // Если свайпнули достаточно далеко - удаляем
+      if (diff > 80) {
+        const type = item.getAttribute('data-type');
+        const index = parseInt(item.getAttribute('data-index'));
+        removeObject(type, index);
+      } else {
+        // Возвращаем на место
+        item.style.transform = 'translateX(0)';
+        item.classList.remove('deleting');
+      }
+      
+      isSwiping = false;
+    });
+  });
+}
+
+// Удаление объекта
+function removeObject(type, index) {
+  if (type === 'window') {
+    windows.splice(index, 1);
+  } else {
+    doors.splice(index, 1);
+  }
+  
+  saveData();
+  drawPlan();
+  updateObjectsList();
+}
+
+// Обновление индикатора размещения объекта
+function updatePlacementIndicator() {
+  const width = parseFloat(document.getElementById('objectWidth').value) || 0;
+  const distance = parseFloat(document.getElementById('objectDistance').value) || 0;
+  const wallLength = walls[selectedWallIndex].length;
+  
+  // Проверяем, помещается ли объект на стену
+  const total = distance + width;
+  const fits = total <= wallLength;
+  
+  // Обновляем индикатор
+  const placementPercent = Math.min((total / wallLength) * 100, 100);
+  const indicator = document.getElementById('placementIndicator');
+  indicator.style.width = placementPercent + '%';
+  indicator.className = 'progress-bar ' + (fits ? 'bg-success' : 'bg-danger');
+  
+  // Обновляем информацию о размещении
+  const info = document.getElementById('placementInfo');
+  if (fits) {
+    info.textContent = `Объект помещается на стену. Осталось места: ${(wallLength - total).toFixed(1)} м`;
+    info.className = 'form-text text-success';
+  } else {
+    info.textContent = `Объект не помещается! Выходит за пределы стены на ${(total - wallLength).toFixed(1)} м`;
+    info.className = 'form-text text-danger';
+  }
+}
+
+// Добавление объекта (окна или двери)
+function addObject() {
+  const width = parseFloat(document.getElementById('objectWidth').value);
+  const distance = parseFloat(document.getElementById('objectDistance').value);
+  
+  // Проверяем, что объект помещается на стену
+  const wall = walls[selectedWallIndex];
+  if (distance + width > wall.length) {
+    alert('Объект не помещается на выбранную стену! Уменьшите ширину или расстояние.');
+    return;
+  }
+  
+  // Добавляем объект в соответствующий массив
+  if (currentObjectType === 'window') {
+    const height = parseFloat(document.getElementById('windowHeight').value);
+    const bottomHeight = parseFloat(document.getElementById('windowBottomHeight').value);
+    const topHeight = roomSettings.wallHeight - bottomHeight - height;
+    
+    // Проверяем, что окно помещается по высоте
+    if (height <= 0 || topHeight < 0) {
+      alert('Окно не помещается по высоте! Уменьшите высоту окна или расстояние от пола.');
+      return;
+    }
+    
+    windows.push({
+      wallIndex: selectedWallIndex,
+      width: width,
+      height: height,
+      bottomHeight: bottomHeight,
+      distance: distance
+    });
+  } else {
+    const height = parseFloat(document.getElementById('doorHeight').value);
+    const topHeight = roomSettings.wallHeight - height;
+    
+    // Проверяем, что дверь помещается по высоте
+    if (height <= 0 || topHeight < 0) {
+      alert('Дверь не помещается по высоте! Уменьшите высоту двери.');
+      return;
+    }
+    
+    doors.push({
+      wallIndex: selectedWallIndex,
+      width: width,
+      height: height,
+      distance: distance
+    });
+  }
+  
+  saveData();
+  drawPlan();
+  updateObjectsList();
+  
+  // Сбрасываем форму к значениям по умолчанию
+  if (currentObjectType === 'window') {
+    document.getElementById('objectWidth').value = '1.2';
+    document.getElementById('windowBottomHeight').value = '0.9';
+    document.getElementById('windowHeight').value = '1.2';
+    updateWindowMockup();
+  } else {
+    document.getElementById('objectWidth').value = '0.9';
+    document.getElementById('doorHeight').value = '2.0';
+    updateDoorMockup();
+  }
+  document.getElementById('objectDistance').value = '0.5';
+  updatePlacementIndicator();
+}
+
+// Масштабирование
+function zoom(factor) {
+  scale *= factor;
+  stage.scale({ x: scale, y: scale });
+  stage.batchDraw();
+}
+
+// Сброс вида
+function resetView() {
+  scale = 1;
+  stage.scale({ x: 1, y: 1 });
+  stage.position({ x: 0, y: 0 });
+  stage.batchDraw();
+}
+
+// Адаптация к изменению размера окна
+function handleResize() {
+  if (stage && walls.length > 0) {
+    const container = document.getElementById('plan-container');
+    stage.width(container.clientWidth);
+    stage.height(container.clientHeight);
+    stage.batchDraw();
+  }
+}
+
+// Инициализация при загрузке страницы
+document.addEventListener('DOMContentLoaded', function() {
+  // Загружаем данные и строим план
+  loadData();
+  
+  // Обработчики выбора типа объекта
+  document.querySelectorAll('.object-type-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      // Убираем активный класс у всех кнопок
+      document.querySelectorAll('.object-type-btn').forEach(b => {
+        b.classList.remove('active');
+      });
+      
+      // Добавляем активный класс к выбранной кнопке
+      this.classList.add('active');
+      
+      // Обновляем текущий тип объекта
+      currentObjectType = this.getAttribute('data-type');
+      
+      // Обновляем значения по умолчанию в зависимости от типа
+      const widthInput = document.getElementById('objectWidth');
+      if (currentObjectType === 'window') {
+        widthInput.value = '1.2';
+        widthInput.min = '0.5';
+        widthInput.max = '3';
+        
+        // Показываем поля для окон, скрываем для дверей
+        document.querySelector('.window-height-inputs').style.display = 'grid';
+        document.querySelector('.door-height-inputs').style.display = 'none';
+        document.querySelector('.window-mockup-container').style.display = 'block';
+        document.querySelector('.door-mockup-container').style.display = 'none';
+        
+        updateWindowMockup();
+      } else {
+        widthInput.value = '0.9';
+        widthInput.min = '0.6';
+        widthInput.max = '1.2';
+        
+        // Показываем поля для дверей, скрываем для окон
+        document.querySelector('.window-height-inputs').style.display = 'none';
+        document.querySelector('.door-height-inputs').style.display = 'block';
+        document.querySelector('.window-mockup-container').style.display = 'none';
+        document.querySelector('.door-mockup-container').style.display = 'block';
+        
+        updateDoorMockup();
+      }
+      
+      // Обновляем индикатор размещения
+      updatePlacementIndicator();
+    });
+  });
+  
+  // Обработчики изменения значений в форме
+  document.getElementById('objectWidth').addEventListener('input', updatePlacementIndicator);
+  document.getElementById('objectDistance').addEventListener('input', updatePlacementIndicator);
+  
+  // Обработчики изменения высот
+  document.getElementById('windowBottomHeight').addEventListener('input', updateWindowMockup);
+  document.getElementById('windowHeight').addEventListener('input', updateWindowMockup);
+  document.getElementById('doorHeight').addEventListener('input', updateDoorMockup);
+  
+  // Обработчик кнопки добавления объекта
+  document.getElementById('btnConfirmObject').addEventListener('click', addObject);
+  
+  // Обработчик кнопки сохранения настроек высот
+  document.getElementById('btnSaveHeights').addEventListener('click', saveHeightSettings);
+  
+  // Обработчики навигации
+  document.getElementById('btnBack').addEventListener('click', () => {
+    window.location.href = 'laser.html';
+  });
+  
+  document.getElementById('btnZoomIn').addEventListener('click', () => {
+    if (stage) zoom(1.2);
+  });
+  
+  document.getElementById('btnZoomOut').addEventListener('click', () => {
+    if (stage) zoom(0.8);
+  });
+  
+  document.getElementById('btnResetView').addEventListener('click', () => {
+    if (stage) resetView();
+  });
+  
+  document.getElementById('btnSettings').addEventListener('click', openHeightModal);
+  
+  // Обработка изменения размера окна
+  window.addEventListener('resize', handleResize);
+});
+</script>
+</body>
+</html>
