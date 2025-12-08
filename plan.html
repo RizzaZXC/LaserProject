@@ -2,20 +2,40 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"/>
 <title>План помещения</title>
 
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
 <script src="https://cdn.jsdelivr.net/npm/konva@9.3.0/konva.min.js"></script>
 
 <style>
-  body {
+  /* Исправления для предотвращения скролла страницы */
+  html, body {
     margin: 0;
+    padding: 0;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
     background: #f3f4f7;
     font-family: Arial, Helvetica, sans-serif;
+    -webkit-text-size-adjust: 100%;
+    -ms-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .app-container {
     display: flex;
     flex-direction: column;
-    min-height: 100vh;
+    height: 100vh;
+    height: -webkit-fill-available;
+    height: fill-available;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: #fff;
   }
 
   .header {
@@ -23,17 +43,34 @@
     border-bottom: 1px solid #ddd;
     padding: 16px;
     text-align: center;
-    position: sticky;
-    top: 0;
     z-index: 20;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    flex-shrink: 0;
+    position: relative;
+  }
+
+  .header h1 {
+    margin: 0;
+    font-size: 1.25rem;
+  }
+
+  .header .subtitle {
+    font-size: 0.875rem;
+    color: #666;
+    margin-top: 8px;
   }
 
   #plan-container {
     flex: 1;
+    overflow: hidden;
+    position: relative;
     background: #fff;
     touch-action: none;
-    position: relative;
+  }
+
+  #konva-container {
+    width: 100%;
+    height: 100%;
   }
 
   .controls {
@@ -43,6 +80,9 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
+    flex-shrink: 0;
+    z-index: 10;
+    position: relative;
   }
 
   .button-row {
@@ -53,7 +93,6 @@
 
   .button-row.single-button {
     justify-content: center;
-    height: 44px;
   }
 
   .btn-control {
@@ -63,11 +102,10 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    touch-action: manipulation;
   }
 
   .btn-height {
-    padding: 0 20px;
-    flex: none;
     width: 100%;
   }
 
@@ -80,6 +118,12 @@
     padding: 40px;
     text-align: center;
     color: #666;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: #fff;
   }
 
   .empty-plan .icon {
@@ -92,6 +136,8 @@
     border-radius: 12px;
     border: none;
     box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    max-height: 80vh;
+    overflow: hidden;
   }
 
   .modal-header {
@@ -99,12 +145,14 @@
     border-bottom: 1px solid #dee2e6;
     border-radius: 12px 12px 0 0;
     padding: 16px 20px;
+    flex-shrink: 0;
   }
 
   .modal-body {
     padding: 20px;
-    max-height: 70vh;
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    flex: 1;
   }
 
   .form-label {
@@ -140,6 +188,7 @@
     cursor: pointer;
     transition: all 0.3s;
     text-align: center;
+    touch-action: manipulation;
   }
 
   .object-type-btn.active {
@@ -170,7 +219,7 @@
 
   .object-item {
     display: flex;
-    justify-content: between;
+    justify-content: space-between;
     align-items: center;
     padding: 10px 15px;
     background: #f8f9fa;
@@ -181,6 +230,7 @@
     transition: transform 0.3s ease;
     touch-action: pan-y;
     user-select: none;
+    min-height: 60px;
   }
 
   .object-item-content {
@@ -188,24 +238,33 @@
     align-items: center;
     gap: 10px;
     flex: 1;
+    min-width: 0;
   }
 
   .object-icon {
     font-size: 20px;
+    flex-shrink: 0;
   }
 
   .object-details {
     flex: 1;
+    min-width: 0;
   }
 
   .object-type {
     font-weight: 600;
     font-size: 14px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .object-specs {
     font-size: 12px;
     color: #666;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .delete-overlay {
@@ -324,52 +383,70 @@
     gap: 10px;
   }
 
-  .door-height-inputs {
-    grid-template-columns: 1fr;
-  }
-
-  .window-height-inputs {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-  }
-
   .form-control {
     margin-top: 0.5rem;
+  }
+
+  /* Исправления для iOS */
+  @supports (-webkit-touch-callout: none) {
+    .app-container {
+      height: -webkit-fill-available;
+    }
+    
+    .modal-body {
+      max-height: 60vh;
+    }
+  }
+
+  /* Предотвращение масштабирования при фокусе */
+  input, textarea, select {
+    font-size: 16px !important;
+  }
+
+  /* Прогресс-бар для размещения */
+  .progress {
+    height: 10px;
+    border-radius: 5px;
+    margin-top: 10px;
+  }
+
+  .progress-bar {
+    border-radius: 5px;
+    transition: width 0.3s ease;
   }
 </style>
 </head>
 
 <body>
-<div class="header">
-  <h1 class="h4 mb-0">План помещения</h1>
-  <div style="font-size: 14px; color: #666; margin-top: 8px;">Двойной клик по стене для добавления окна или двери</div>
-</div>
+<div class="app-container">
+  <div class="header">
+    <h1 class="h4 mb-0">План помещения</h1>
+    <div class="subtitle">Двойной клик по стене для добавления окна или двери</div>
+  </div>
 
-<div id="plan-container">
-  <div class="empty-plan">
-    <div class="icon">📐</div>
-    <div style="font-size: 18px; margin-bottom: 8px;">План не построен</div>
-    <div style="font-size: 14px;">Вернитесь в редактор и добавьте стены</div>
+  <div id="plan-container">
+    <div id="konva-container"></div>
+    <div class="empty-plan">
+      <div class="icon">📐</div>
+      <div style="font-size: 18px; margin-bottom: 8px;">План не построен</div>
+      <div style="font-size: 14px;">Вернитесь в редактор и добавьте стены</div>
+    </div>
   </div>
-</div>
 
-<div class="controls">
-  <!-- Первая строка: 2 кнопки -->
-  <div class="button-row">
-    <button id="btnBack" class="btn btn-secondary btn-control">← Назад</button>
-    <button id="btnResetView" class="btn btn-info btn-control">⟲ Сбросить вид</button>
-  </div>
-  
-  <!-- Вторая строка: 2 кнопки -->
-  <div class="button-row">
-    <button id="btnZoomIn" class="btn btn-primary btn-control">+</button>
-    <button id="btnZoomOut" class="btn btn-primary btn-control">-</button>
-  </div>
-  
-  <!-- Третья строка: 1 большая кнопка -->
-  <div class="button-row single-button">
-    <button id="btnSettings" class="btn btn-success btn-height">⚙ Высота стен</button>
+  <div class="controls">
+    <div class="button-row">
+      <button id="btnBack" class="btn btn-secondary btn-control">← Назад</button>
+      <button id="btnResetView" class="btn btn-info btn-control">⟲ Сбросить вид</button>
+    </div>
+    
+    <div class="button-row">
+      <button id="btnZoomIn" class="btn btn-primary btn-control">+</button>
+      <button id="btnZoomOut" class="btn btn-primary btn-control">-</button>
+    </div>
+    
+    <div class="button-row single-button">
+      <button id="btnSettings" class="btn btn-success btn-height">⚙ Высота стен</button>
+    </div>
   </div>
 </div>
 
@@ -412,12 +489,12 @@
           </div>
           <div class="mb-3">
             <label class="form-label">Высота окна (м)</label>
-            <input type="number" step="0.1" min="0.1" max="5" value="1.2" class="form-control mt-4" id="windowHeight">
+            <input type="number" step="0.1" min="0.1" max="5" value="1.2" class="form-control" id="windowHeight">
           </div>
         </div>
         
         <!-- Параметры высоты для дверей -->
-        <div class="door-height-inputs">
+        <div class="door-height-inputs" style="display: none;">
           <div class="mb-3">
             <label class="form-label">Высота двери (м)</label>
             <input type="number" step="0.1" min="0.1" max="5" value="2.0" class="form-control" id="doorHeight">
@@ -556,6 +633,8 @@ function loadData() {
   
   if (walls.length > 0) {
     drawPlan();
+  } else {
+    document.querySelector('.empty-plan').style.display = 'flex';
   }
 }
 
@@ -602,8 +681,6 @@ function updateWindowMockup() {
   
   // Обновляем макет
   const windowMockup = document.getElementById('windowMockup');
-  const containerWidth = 300; // примерная ширина контейнера
-  const containerHeight = 200; // высота контейнера
   
   // Позиционирование по ширине - объект по центру
   const widthPercent = (objectWidth / wallLength) * 100;
@@ -613,7 +690,7 @@ function updateWindowMockup() {
   const heightPercent = (windowHeight / wallHeight) * 100;
   
   // Объект всегда по центру
-  windowMockup.style.width = widthPercent + '%';
+  windowMockup.style.width = Math.min(widthPercent, 100) + '%';
   windowMockup.style.bottom = bottomPercent + '%';
   windowMockup.style.height = heightPercent + '%';
   
@@ -652,7 +729,7 @@ function updateDoorMockup() {
   const heightPercent = (doorHeight / wallHeight) * 100;
   
   // Объект всегда по центру
-  doorMockup.style.width = widthPercent + '%';
+  doorMockup.style.width = Math.min(widthPercent, 100) + '%';
   doorMockup.style.bottom = '0%';
   doorMockup.style.height = heightPercent + '%';
   
@@ -669,16 +746,19 @@ function updateDoorMockup() {
 
 // Построение плана помещения
 function drawPlan() {
+  // Скрываем сообщение о пустом плане
+  document.querySelector('.empty-plan').style.display = 'none';
+  
   // Очищаем контейнер
   const container = document.getElementById('plan-container');
-  container.innerHTML = '';
   
   // Создаем сцену
   stage = new Konva.Stage({
-    container: 'plan-container',
+    container: 'konva-container',
     width: container.clientWidth,
     height: container.clientHeight,
-    listening: true
+    listening: true,
+    draggable: true
   });
 
   layer = new Konva.Layer({
@@ -1020,9 +1100,6 @@ function drawPlan() {
   layer.add(legend);
 
   layer.batchDraw();
-
-  // Включаем перетаскивание
-  stage.draggable(true);
 }
 
 // Открытие модального окна для добавления объекта
@@ -1469,7 +1546,7 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // Обработчики навигации
   document.getElementById('btnBack').addEventListener('click', () => {
-    window.location.href = 'index.html';
+    window.location.href = 'index.html'; // Измените на нужный URL
   });
   
   document.getElementById('btnZoomIn').addEventListener('click', () => {
@@ -1488,8 +1565,19 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // Обработка изменения размера окна
   window.addEventListener('resize', handleResize);
+  
+  // Установка правильной высоты при загрузке
+  function setAppHeight() {
+    const appContainer = document.querySelector('.app-container');
+    if (appContainer) {
+      appContainer.style.height = window.innerHeight + 'px';
+    }
+  }
+  
+  setAppHeight();
+  window.addEventListener('resize', setAppHeight);
+  window.addEventListener('orientationchange', setAppHeight);
 });
 </script>
 </body>
-
 </html>
