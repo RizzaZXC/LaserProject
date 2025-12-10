@@ -52,7 +52,8 @@
     display: flex;
     flex-direction: column;
     position: relative;
-    min-height: 0; /* Важно для правильного скроллинга в flex-контейнере */
+    min-height: 0;
+    overflow: hidden; /* Важно для предотвращения конфликтов */
   }
 
   #wallsList {
@@ -62,7 +63,15 @@
     -webkit-overflow-scrolling: touch;
     padding: 0;
     position: relative;
-    min-height: 0; /* Важно для правильного скроллинга */
+    min-height: 0;
+    /* Убираем стандартное поведение для добавления кастомного скролла */
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE and Edge */
+  }
+
+  /* Скрываем стандартный скроллбар */
+  #wallsList::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
   }
 
   .walls-container {
@@ -70,6 +79,8 @@
     padding: 0;
     margin: 0;
     width: 100%;
+    /* Важно для плавной анимации скролла */
+    will-change: transform;
   }
 
   .wall-item {
@@ -80,13 +91,17 @@
     background: #fff;
     position: relative;
     transition: transform 0.3s ease;
-    touch-action: pan-y;
+    touch-action: pan-y; /* Разрешаем вертикальные жесты */
     user-select: none;
     min-height: 76px;
     box-sizing: border-box;
     width: 100%;
-    max-width: 100vw; /* Запрещаем выход за пределы экрана */
-    overflow: hidden; /* Скрываем всё, что выходит за пределы */
+    max-width: 100vw;
+    overflow: hidden;
+    /* Отключаем выделение текста при касании */
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
   }
 
   .wall-item:last-child {
@@ -115,7 +130,7 @@
     gap: 8px;
     margin-right: 12px;
     min-width: 0;
-    overflow: hidden; /* Скрываем переполнение текста */
+    overflow: hidden;
   }
 
   .info-group {
@@ -386,6 +401,31 @@
     opacity: 1;
   }
 
+  /* Класс для блокировки скролла при свайпе для удаления */
+  .no-scroll {
+    overflow: hidden !important;
+  }
+
+  /* Индикатор скролла */
+  .scroll-indicator {
+    position: absolute;
+    right: 2px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 4px;
+    height: 40px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 2px;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+    z-index: 5;
+  }
+
+  .scroll-indicator.visible {
+    opacity: 1;
+  }
+
   /* Исправления для iOS */
   @supports (-webkit-touch-callout: none) {
     .app-container {
@@ -402,22 +442,21 @@
     font-size: 24px !important;
   }
 
-  /* Улучшенный скроллинг */
-  #wallsList::-webkit-scrollbar {
+  /* Кастомный скроллбар (опционально) */
+  .custom-scrollbar {
+    position: absolute;
+    right: 2px;
+    top: 0;
     width: 4px;
-  }
-
-  #wallsList::-webkit-scrollbar-track {
-    background: #f1f1f1;
-  }
-
-  #wallsList::-webkit-scrollbar-thumb {
-    background: #888;
+    background: rgba(0, 0, 0, 0.1);
     border-radius: 2px;
+    opacity: 0;
+    transition: opacity 0.3s;
+    z-index: 5;
   }
 
-  #wallsList::-webkit-scrollbar-thumb:hover {
-    background: #555;
+  .custom-scrollbar.visible {
+    opacity: 1;
   }
 </style>
 </head>
@@ -436,6 +475,7 @@
         <div class="text">Добавьте первую стену</div>
       </div>
     </div>
+    <div class="scroll-indicator"></div>
   </div>
 
   <!-- Фиксированное меню внизу -->
@@ -485,6 +525,15 @@
 // Хранение данных о стенах
 let walls = [];
 let currentAngle = 90;
+
+// Переменные для управления скроллом
+let isScrolling = false;
+let scrollStartY = 0;
+let scrollStartTop = 0;
+let scrollVelocity = 0;
+let scrollAnimationFrame = null;
+let lastScrollTime = 0;
+let isHorizontalSwipe = false;
 
 // Буфер для хранения позиций стен в превью
 let previewPositions = [];
@@ -890,24 +939,32 @@ function refreshList() {
   // Добавляем обработчики свайпа для удаления
   setupSwipeHandlers();
   
+  // Добавляем обработчики для скролла в любом месте
+  setupScrollHandlers();
+  
   // Прокручиваем список вниз
   setTimeout(() => {
     list.scrollTop = list.scrollHeight;
   }, 100);
 }
 
-// Настройка обработчиков свайпа
+// Настройка обработчиков свайпа для удаления
 function setupSwipeHandlers() {
   const items = document.querySelectorAll('.wall-item');
   
   items.forEach(item => {
     let startX = 0;
+    let startY = 0;
     let currentX = 0;
-    let isSwiping = true;
+    let isSwiping = false;
+    let isHorizontalSwipeDetermined = false;
     
     item.addEventListener('touchstart', (e) => {
       startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
       isSwiping = true;
+      isHorizontalSwipeDetermined = false;
+      isHorizontalSwipe = false;
       e.preventDefault();
     }, { passive: false });
     
@@ -915,29 +972,45 @@ function setupSwipeHandlers() {
       if (!isSwiping) return;
       
       currentX = e.touches[0].clientX;
-      const diff = startX - currentX;
+      const currentY = e.touches[0].clientY;
+      const diffX = startX - currentX;
+      const diffY = startY - currentY;
       
-      // Ограничиваем максимальное смещение
-      if (diff > 0 && diff <= 120) {
-        item.style.transform = `translateX(-${diff}px)`;
-        e.preventDefault();
+      // Определяем, это горизонтальный или вертикальный свайп
+      if (!isHorizontalSwipeDetermined) {
+        if (Math.abs(diffX) > Math.abs(diffY) * 1.5) {
+          isHorizontalSwipe = true;
+          isHorizontalSwipeDetermined = true;
+        } else if (Math.abs(diffY) > Math.abs(diffX) * 1.5) {
+          isHorizontalSwipe = false;
+          isHorizontalSwipeDetermined = true;
+        }
       }
       
-      // Показываем overlay при достаточном смещении
-      if (diff > 60) {
-        item.classList.add('deleting');
-      } else {
-        item.classList.remove('deleting');
+      // Если это горизонтальный свайп, обрабатываем удаление
+      if (isHorizontalSwipe && isHorizontalSwipeDetermined) {
+        // Ограничиваем максимальное смещение
+        if (diffX > 0 && diffX <= 120) {
+          item.style.transform = `translateX(-${diffX}px)`;
+          e.preventDefault();
+        }
+        
+        // Показываем overlay при достаточном смещении
+        if (diffX > 60) {
+          item.classList.add('deleting');
+        } else {
+          item.classList.remove('deleting');
+        }
       }
     }, { passive: false });
     
     item.addEventListener('touchend', () => {
       if (!isSwiping) return;
       
-      const diff = startX - currentX;
+      const diffX = startX - currentX;
       
       // Если свайпнули достаточно далеко - удаляем
-      if (diff > 80) {
+      if (isHorizontalSwipe && diffX > 80) {
         const index = parseInt(item.getAttribute('data-index'));
         deleteWall(index);
       } else {
@@ -947,7 +1020,137 @@ function setupSwipeHandlers() {
       }
       
       isSwiping = false;
+      isHorizontalSwipe = false;
+      isHorizontalSwipeDetermined = false;
     });
+  });
+}
+
+// Настройка обработчиков скролла в любом месте
+function setupScrollHandlers() {
+  const list = document.getElementById('wallsList');
+  const container = list.querySelector('.walls-container');
+  const scrollIndicator = document.querySelector('.scroll-indicator');
+  
+  if (!container) return;
+  
+  let touchStartY = 0;
+  let scrollStartTop = 0;
+  let isScrolling = false;
+  let scrollAnimationFrame = null;
+  let lastScrollTime = 0;
+  let scrollVelocity = 0;
+  let lastScrollTop = 0;
+  
+  // Функция для обновления скролла
+  function updateScroll() {
+    if (!isScrolling && scrollVelocity !== 0) {
+      // Инерционный скролл
+      scrollVelocity *= 0.95; // Замедление
+      
+      if (Math.abs(scrollVelocity) < 0.5) {
+        scrollVelocity = 0;
+      }
+      
+      list.scrollTop += scrollVelocity;
+      
+      // Показываем индикатор скролла
+      showScrollIndicator();
+      
+      if (scrollVelocity !== 0) {
+        scrollAnimationFrame = requestAnimationFrame(updateScroll);
+      }
+    }
+  }
+  
+  // Функция для показа индикатора скролла
+  function showScrollIndicator() {
+    const scrollPercent = list.scrollTop / (list.scrollHeight - list.clientHeight);
+    const indicatorHeight = Math.max(40, list.clientHeight * 0.2);
+    const indicatorTop = scrollPercent * (list.clientHeight - indicatorHeight);
+    
+    scrollIndicator.style.height = indicatorHeight + 'px';
+    scrollIndicator.style.top = (indicatorTop + list.offsetTop) + 'px';
+    scrollIndicator.classList.add('visible');
+    
+    clearTimeout(scrollIndicator.timeout);
+    scrollIndicator.timeout = setTimeout(() => {
+      scrollIndicator.classList.remove('visible');
+    }, 1000);
+  }
+  
+  // Обработчик начала касания
+  list.addEventListener('touchstart', (e) => {
+    touchStartY = e.touches[0].clientY;
+    scrollStartTop = list.scrollTop;
+    isScrolling = true;
+    scrollVelocity = 0;
+    lastScrollTime = Date.now();
+    lastScrollTop = list.scrollTop;
+    
+    if (scrollAnimationFrame) {
+      cancelAnimationFrame(scrollAnimationFrame);
+      scrollAnimationFrame = null;
+    }
+    
+    // Предотвращаем стандартное поведение для лучшей производительности
+    e.preventDefault();
+  }, { passive: false });
+  
+  // Обработчик движения
+  list.addEventListener('touchmove', (e) => {
+    if (!isScrolling) return;
+    
+    const touchY = e.touches[0].clientY;
+    const deltaY = touchStartY - touchY;
+    
+    // Вычисляем новую позицию скролла
+    const newScrollTop = scrollStartTop + deltaY;
+    
+    // Ограничиваем скролл в пределах допустимого
+    const maxScrollTop = list.scrollHeight - list.clientHeight;
+    const constrainedScrollTop = Math.max(0, Math.min(maxScrollTop, newScrollTop));
+    
+    // Применяем скролл
+    list.scrollTop = constrainedScrollTop;
+    
+    // Вычисляем скорость для инерции
+    const currentTime = Date.now();
+    const timeDiff = currentTime - lastScrollTime;
+    
+    if (timeDiff > 0) {
+      scrollVelocity = (list.scrollTop - lastScrollTop) / timeDiff * 16;
+      lastScrollTop = list.scrollTop;
+      lastScrollTime = currentTime;
+    }
+    
+    // Показываем индикатор скролла
+    showScrollIndicator();
+    
+    e.preventDefault();
+  }, { passive: false });
+  
+  // Обработчик окончания касания
+  list.addEventListener('touchend', () => {
+    isScrolling = false;
+    
+    // Запускаем инерционный скролл
+    if (Math.abs(scrollVelocity) > 0.5) {
+      scrollAnimationFrame = requestAnimationFrame(updateScroll);
+    }
+  });
+  
+  // Также поддерживаем стандартный колесико мыши
+  list.addEventListener('wheel', (e) => {
+    // Показываем индикатор скролла при использовании колесика
+    showScrollIndicator();
+    
+    // Позволяем стандартное поведение колесика
+  });
+  
+  // Показываем индикатор при ручном скролле
+  list.addEventListener('scroll', () => {
+    showScrollIndicator();
   });
 }
 
